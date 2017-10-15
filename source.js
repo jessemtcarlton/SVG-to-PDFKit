@@ -1201,7 +1201,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < children.length; i++) {
           if (children[i].get('display') !== 'none') {
             if (typeof children[i].drawInDocument === 'function') {
+              if (typeof beforeDrawingCallback == 'function') {
+                beforeDrawingCallback(doc, children[i], isClip, isMask);
+              }
               children[i].drawInDocument(isClip, isMask);
+              if (typeof afterDrawingCallback == 'function') {
+                afterDrawingCallback(doc, children[i], isClip, isMask);
+              }
             }
           }
         }
@@ -2190,6 +2196,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback,
+        beforeDrawingCallback = options.beforeDrawingCallback,
+        afterDrawingCallback = options.afterDrawingCallback,
         precision = Math.ceil(Math.max(1, options.precision)) || 3;
 
     if (typeof warningCallback !== 'function') {
