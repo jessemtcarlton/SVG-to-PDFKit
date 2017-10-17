@@ -4,6 +4,47 @@
 
 * Using peerDependencies for pdfkit
 * adding callback for element drawing.
+* support color from color books
+  - must use my forked [pdfkit](https://github.com/jacobbubu/pdfkit)
+
+``` js
+import SVGtoPDF from "svg-to-pdfkit";
+import { load } from "color-books";
+
+const getColor = (bookName, colorName: string) {
+  const book = load(bookName);
+  if (book.records[colorName]) {
+    return {
+      name: colorName,
+      colorSpace: book.colorSpace,
+      components: book.records[colorName].components,
+      isSpot: book.isSpot
+    };
+  }
+};
+
+// <path d="..." fill="COLOR_BOOK(PANTONE+ CMYK Coated/PANTONE P 24-8 C)"></path>
+const parseColorCallback = (color) => {
+  const temp = color.match(/^COLOR_BOOK\((.+)\/(.+)\)$/);
+  if (temp) {
+    const [bookName, colorName] = temp.slice(1);
+    return getColor(bookName, colorName);
+  }
+};
+
+const draw = (doc, svg, { left, top, width, height }) => {
+  doc.save();
+  try {
+    SVGtoPDF(doc, svg, left, top, {
+      width,
+      height,
+      parseColorCallback
+    });
+  } finally {
+    doc.restore();
+  }
+};
+```
 
 Insert SVG into a PDF document created with PDFKit.
 
