@@ -56,46 +56,67 @@ const draw = (doc, svg, { left, top, width, height }) => {
 fs = require 'fs'
 PDFDocument = require 'pdfkit'
 SVGtoPDF = require 'svg-to-pdfkit'
-jsdom = require 'jsdom'
-{ JSDOM } = jsdom
-reduce = Array.prototype.reduce
+open = require 'opn'
+cheerio = require 'cheerio'
+css = require 'css'
 
-SvgContent = fs.readFileSync 'svgs/border-trim-css.svg', 'utf8'
+doc = new PDFDocument autoFirstPage: false
 
-styledDOMFromSVGdom = (svg) ->
-    dom = new JSDOM svg
-    nodeList = dom.window.document.querySelectorAll('style')
-    styles = reduce.call nodeList, (sum, curr) ->
-        sum += curr.textContent + '\n'
-    , ''
-    styles = "<style>#{styles}</<style>>"
+###
+<svg>
+    <defs>
+        <style>
+            .cls-1 {
+                fill: red;
+            }
+            .cls-2 {
+                stroke: yellow;
+            }
+        </style>
+    </defs>
+    <rect class="cls-1 cls-2" x="0" y="0" width="100" height="100" />
+</svg>
+###
+svgContent = fs.readFileSync 'has-css.svg', 'utf8'
 
-domForCSSMatch = new JSDOM styledDOMFromSVGdom(SvgContent)
+$ = cheerio.load svgContent, xmlMode: true
 
-doc = new PDFDocument {
-    autoFirstPage: false,
-    version: 1.6
-}
+styles = reduce.call $('svg defs style').contents(), (sum, curr) ->
+    if curr.type is 'text'
+        sum += curr.data + '\n'
+    sum
+, ''
+
+parsed = css.parse(styles)
+
+cssProps = parsed.stylesheet.rules.reduce (propsBySelector, rule) ->
+    if rule.type is 'rule'
+        props = rule.declarations.reduce (sum, decor) ->
+            sum[decor.property] = decor.value
+            sum
+        , {}
+
+        for s in rule.selectors
+            propsBySelector[s] = props
+    propsBySelector
+, {}
 
 doc.pipe fs.createWriteStream 'output.pdf'
-doc.info.Author = "SkinAT Co., Ltd."
 
 doc.addPage { size: [512, 512], margin: 0 }
 
 getComputedStyleCallback = (node) ->
-    className = node.getAttribute('class')
-    if className
-        tempEle = domForCSSMatch.window.document.createElement 'div'
-        tempEle.className = className
-        styles = domForCSSMatch.window.getComputedStyle tempEle
-        return styles
-    else
-        {}
+    if node.getAttribute('class')
+        classNames = node.getAttribute('class').split(/\s/)
+        styles = classNames.reduce((sum, name) ->
+            name = '.' + name
+            if cssProps[name]
+                sum = { sum..., cssProps[name]... }
+            sum
+        , {})
+        styles
 
-parseNodeCallback = (node) ->
-
-SVGtoPDF doc, SvgContent, 0, 0, { width: 200, height: 200, getComputedStyleCallback }
-
+SVGtoPDF doc, svgContent, 0, 0, { width: 200, height: 200, getComputedStyleCallback }
 doc.end();
 ```
 
