@@ -6,6 +6,10 @@
 * adding callback for element drawing.
 * support color from color books
   - must use my forked [pdfkit](https://github.com/jacobbubu/pdfkit)
+* support customized getComputedStyle
+  - Add getComputedStyleCallback
+
+### Example for parseColorCallback
 
 ``` js
 import SVGtoPDF from "svg-to-pdfkit";
@@ -44,6 +48,55 @@ const draw = (doc, svg, { left, top, width, height }) => {
     doc.restore();
   }
 };
+```
+
+### Example for getComputedStyleCallback
+
+``` coffee
+fs = require 'fs'
+PDFDocument = require 'pdfkit'
+SVGtoPDF = require 'svg-to-pdfkit'
+jsdom = require 'jsdom'
+{ JSDOM } = jsdom
+reduce = Array.prototype.reduce
+
+SvgContent = fs.readFileSync 'svgs/border-trim-css.svg', 'utf8'
+
+styledDOMFromSVGdom = (svg) ->
+    dom = new JSDOM svg
+    nodeList = dom.window.document.querySelectorAll('style')
+    styles = reduce.call nodeList, (sum, curr) ->
+        sum += curr.textContent + '\n'
+    , ''
+    styles = "<style>#{styles}</<style>>"
+
+domForCSSMatch = new JSDOM styledDOMFromSVGdom(SvgContent)
+
+doc = new PDFDocument {
+    autoFirstPage: false,
+    version: 1.6
+}
+
+doc.pipe fs.createWriteStream 'output.pdf'
+doc.info.Author = "SkinAT Co., Ltd."
+
+doc.addPage { size: [512, 512], margin: 0 }
+
+getComputedStyleCallback = (node) ->
+    className = node.getAttribute('class')
+    if className
+        tempEle = domForCSSMatch.window.document.createElement 'div'
+        tempEle.className = className
+        styles = domForCSSMatch.window.getComputedStyle tempEle
+        return styles
+    else
+        {}
+
+parseNodeCallback = (node) ->
+
+SVGtoPDF doc, SvgContent, 0, 0, { width: 200, height: 200, getComputedStyleCallback }
+
+doc.end();
 ```
 
 Insert SVG into a PDF document created with PDFKit.

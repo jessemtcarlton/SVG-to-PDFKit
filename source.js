@@ -284,6 +284,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if ((temp = parser.match(/^<\/([\w:.-]+)\s*>/, true))) {
             // Closing tag
             if (temp[1] === node.nodeName) {
+              if (typeof parseNodeCallback === 'function') {
+                parseNodeCallback(node);
+              }
               return node;
             } else {
               warningCallback(
@@ -2194,9 +2197,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       if (useCSS && key !== "transform") {
         // the CSS transform behaves strangely
         if (!this.css) {
-          this.css = getComputedStyle(obj);
+          if (typeof getComputedStyleCallback === 'function') {
+            this.css = getComputedStyleCallback(obj)
+          } else {
+            this.css = getComputedStyle(obj);
+          }
         }
-        value = this.css[keyInfo.css || key] || this.attr(key);
+        if (this.css) {
+          value = this.css[keyInfo.css || key] || this.attr(key);
+        } else {
+          value = this.style[key] || this.attr(key);
+        }
       } else {
         value = this.style[key] || this.attr(key);
       }
@@ -3950,17 +3961,23 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     viewportWidth = (options.width || doc.page.width) / pxToPt,
     viewportHeight = (options.height || doc.page.height) / pxToPt,
     preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
-    useCSS =
+    getComputedStyleCallback = options.getComputedStyleCallback,
+
+    useCSS = (typeof getComputedStyleCallback === 'function') || (
       options.useCSS &&
       typeof SVGElement !== "undefined" &&
       svg instanceof SVGElement &&
-      typeof getComputedStyle === "function",
+      typeof getComputedStyle === "function"
+    ),
+
     warningCallback = options.warningCallback,
     fontCallback = options.fontCallback,
     imageCallback = options.imageCallback,
     beforeDrawingCallback = options.beforeDrawingCallback,
     afterDrawingCallback = options.afterDrawingCallback,
     parseColorCallback = options.parseColorCallback,
+    parseNodeCallback = options.parseNodeCallback,
+
     precision = Math.ceil(Math.max(1, options.precision)) || 3;
 
   if (typeof warningCallback !== "function") {
