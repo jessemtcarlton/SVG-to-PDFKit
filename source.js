@@ -4058,7 +4058,7 @@ var SVGtoPDF = (function() {
         if (options.draw) {
           doc
             .save()
-            .translate(x || 0, y || 0)
+            .translate(options.x || 0, options.y || 0)
             .scale(pxToPt);
           elem.drawInDocument();
           doc.restore();
@@ -4078,6 +4078,8 @@ var SVGtoPDF = (function() {
     } else {
       warningCallback("SVGtoPDF: the input does not look like a valid SVG");
     }
+  }
+  return { directDraw, generateSVGObject }
 })();
 
 if (
