@@ -1,15 +1,16 @@
-"use strict"
+"use strict";
 
 var SVGtoPDF = (function() {
-
   function directDraw(doc, svg, x, y, options) {
-    options = {...options, draw: true, x, y };
+    options = { ...options, draw: true, x, y };
     generateSVGObject(doc, svg, options);
   }
 
   function generateSVGObject(doc, svg, options) {
     doc.addContent = function(data) {
-      ((this._currentGroup && this._currentGroup.xobj) || this.page).write(data);
+      ((this._currentGroup && this._currentGroup.xobj) || this.page).write(
+        data
+      );
       return this;
     };
     function docBeginGroup() {
@@ -122,7 +123,9 @@ var SVGtoPDF = (function() {
       if (!doc.page.fonts[font.id]) {
         doc.page.fonts[font.id] = font.ref();
       }
-      return doc.addContent("BT").addContent("/" + font.id + " " + size + " Tf");
+      return doc
+        .addContent("BT")
+        .addContent("/" + font.id + " " + size + " Tf");
     }
     function docSetTextMatrix(a, b, c, d, e, f) {
       return doc.addContent(
@@ -291,7 +294,7 @@ var SVGtoPDF = (function() {
             if ((temp = parser.match(/^<\/([\w:.-]+)\s*>/, true))) {
               // Closing tag
               if (temp[1] === node.nodeName) {
-                if (typeof parseNodeCallback === 'function') {
+                if (typeof parseNodeCallback === "function") {
                   parseNodeCallback(node);
                 }
                 return node;
@@ -779,7 +782,9 @@ var SVGtoPDF = (function() {
           return temp.slice(1, 5);
         }
       } else if (
-        (temp = v.match(/^rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)$/))
+        (temp = v.match(
+          /^rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)$/
+        ))
       ) {
         temp[1] = parseInt(temp[1]);
         temp[2] = parseInt(temp[2]);
@@ -798,7 +803,9 @@ var SVGtoPDF = (function() {
         if (temp[1] < 256 && temp[2] < 256 && temp[3] < 256) {
           return temp.slice(1, 4).concat(1);
         }
-      } else if ((temp = v.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/))) {
+      } else if (
+        (temp = v.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/))
+      ) {
         return temp
           .slice(1, 4)
           .map(function(x) {
@@ -1120,7 +1127,10 @@ var SVGtoPDF = (function() {
         } else {
           let d = b * b - 4 * a * c;
           if (isNotEqual(d, 0) && d > 0) {
-            return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
+            return [
+              (-b + Math.sqrt(d)) / (2 * a),
+              (-b - Math.sqrt(d)) / (2 * a)
+            ];
           } else if (isEqual(d, 0)) {
             return [-b / (2 * a)];
           } else {
@@ -1328,7 +1338,11 @@ var SVGtoPDF = (function() {
           this[command].apply(this, values);
         } else {
           warningCallback(
-            "SvgPath: command " + command + " with " + values.length + " numbers"
+            "SvgPath: command " +
+              command +
+              " with " +
+              values.length +
+              " numbers"
           );
           return;
         }
@@ -1487,7 +1501,8 @@ var SVGtoPDF = (function() {
           fs = 1 * !!fs;
           let x1 =
               Math.cos(fi) * (currX - x) / 2 + Math.sin(fi) * (currY - y) / 2,
-            y1 = Math.cos(fi) * (currY - y) / 2 - Math.sin(fi) * (currX - x) / 2,
+            y1 =
+              Math.cos(fi) * (currY - y) / 2 - Math.sin(fi) * (currX - x) / 2,
             lambda = x1 * x1 / (rx * rx) + y1 * y1 / (ry * ry);
           if (lambda > 1) {
             rx *= Math.sqrt(lambda);
@@ -2204,14 +2219,15 @@ var SVGtoPDF = (function() {
         if (useCSS && key !== "transform") {
           // the CSS transform behaves strangely
           if (!this.css) {
-            if (typeof getComputedStyleCallback === 'function') {
-              this.css = getComputedStyleCallback(obj)
+            if (typeof getComputedStyleCallback === "function") {
+              this.css = getComputedStyleCallback(obj);
             } else {
               this.css = getComputedStyle(obj);
             }
           }
           if (this.css) {
-            value = this.style[key] || this.css[keyInfo.css || key] || this.attr(key);
+            value =
+              this.style[key] || this.css[keyInfo.css || key] || this.attr(key);
           } else {
             value = this.style[key] || this.attr(key);
           }
@@ -2265,7 +2281,10 @@ var SVGtoPDF = (function() {
                 if (value === "none") {
                   return [];
                 }
-                let dasharray = this.computeLengthList(value, this.getViewport());
+                let dasharray = this.computeLengthList(
+                  value,
+                  this.getViewport()
+                );
                 if (dasharray.error) {
                   return;
                 }
@@ -2458,7 +2477,10 @@ var SVGtoPDF = (function() {
           fill = this.get("fill"),
           fillOpacity = this.get("fill-opacity");
         if (fill !== "none" && opacity && fillOpacity) {
-          if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
+          if (
+            fill instanceof SvgElemGradient ||
+            fill instanceof SvgElemPattern
+          ) {
             return fill.getPaint(
               this.getBoundingBox(),
               fillOpacity * opacity,
@@ -2533,14 +2555,19 @@ var SVGtoPDF = (function() {
         return shape;
       };
       this.drawChildren = function(isClip, isMask) {
-        let children = this.getChildren();
+        let children = this.getChildren(), drawChildren = true;
         for (let i = 0; i < children.length; i++) {
           if (children[i].get("display") !== "none") {
             if (typeof children[i].drawInDocument === "function") {
               if (typeof beforeDrawingCallback == "function") {
-                beforeDrawingCallback(doc, children[i], isClip, isMask);
+                drawChildren = beforeDrawingCallback(doc, children[i], isClip, isMask);
+                if (typeof drawChildren === 'undefined') {
+                  drawChildren = true;
+                }
               }
-              children[i].drawInDocument(isClip, isMask);
+              if (drawChildren) {
+                children[i].drawInDocument(isClip, isMask);
+              }
               if (typeof afterDrawingCallback == "function") {
                 afterDrawingCallback(doc, children[i], isClip, isMask);
               }
@@ -2887,7 +2914,10 @@ var SVGtoPDF = (function() {
           doc.transform.apply(doc, aspectRatioMatrix);
           this.drawChildren(isClip, isMask);
           docEndGroup(group);
-          return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
+          return [
+            docCreatePattern(group, 0, 0, width, height, matrix),
+            gOpacity
+          ];
         } else {
           return fallback
             ? [fallback.slice(0, 3), fallback[3] * gOpacity]
@@ -3132,7 +3162,9 @@ var SVGtoPDF = (function() {
               ) {
                 let x = subPaths[j].boundingBox[0],
                   y = subPaths[j].boundingBox[1];
-                Array.isArray(stroke) ? docFillColor.apply(doc, stroke) : docFillColor.call(doc, stroke, 1);
+                Array.isArray(stroke)
+                  ? docFillColor.apply(doc, stroke)
+                  : docFillColor.call(doc, stroke, 1);
                 if (LineCap === "square") {
                   doc.rect(
                     x - 0.5 * LineWidth,
@@ -3149,7 +3181,9 @@ var SVGtoPDF = (function() {
           }
           if (fill || stroke) {
             if (fill) {
-              Array.isArray(fill) ? docFillColor.apply(doc, fill) : docFillColor.call(doc, fill, 1);
+              Array.isArray(fill)
+                ? docFillColor.apply(doc, fill)
+                : docFillColor.call(doc, fill, 1);
             }
             if (stroke) {
               let dashArray = this.get("stroke-dasharray"),
@@ -3160,7 +3194,9 @@ var SVGtoPDF = (function() {
                 }
                 dashOffset *= this.dashScale;
               }
-              Array.isArray(stroke) ? docStrokeColor.apply(doc, stroke) : docStrokeColor.call(doc, stroke, 1);
+              Array.isArray(stroke)
+                ? docStrokeColor.apply(doc, stroke)
+                : docStrokeColor.call(doc, stroke, 1);
               doc
                 .lineWidth(this.get("stroke-width"))
                 .miterLimit(this.get("stroke-miterlimit"))
@@ -3498,7 +3534,8 @@ var SVGtoPDF = (function() {
             this.getLength("y", this.getVHeight(), -0.1) * (bBox[3] - bBox[1]) +
             bBox[1];
           w =
-            this.getLength("width", this.getVWidth(), 1.2) * (bBox[2] - bBox[0]);
+            this.getLength("width", this.getVWidth(), 1.2) *
+            (bBox[2] - bBox[0]);
           h =
             this.getLength("height", this.getVHeight(), 1.2) *
             (bBox[3] - bBox[1]);
@@ -3557,10 +3594,14 @@ var SVGtoPDF = (function() {
               if (fill || stroke || isClip) {
                 if (!isClip) {
                   if (fill) {
-                    Array.isArray(fill) ? docFillColor.apply(doc, fill) : docFillColor.call(doc, fill, 1);
+                    Array.isArray(fill)
+                      ? docFillColor.apply(doc, fill)
+                      : docFillColor.call(doc, fill, 1);
                   }
                   if (stroke && strokeWidth) {
-                    Array.isArray(stroke) ? docStrokeColor.apply(doc, stroke) : docStrokeColor.call(doc, stroke, 1);
+                    Array.isArray(stroke)
+                      ? docStrokeColor.apply(doc, stroke)
+                      : docStrokeColor.call(doc, stroke, 1);
                     doc
                       .lineWidth(strokeWidth)
                       .miterLimit(this.get("stroke-miterlimit"))
@@ -3720,7 +3761,7 @@ var SVGtoPDF = (function() {
             warningCallback(
               'SVGElemText: failed to open font "' +
                 fontNameorLink +
-                '" in PDFKit'
+                '" in PDFKit. ' + e
             );
           }
           currentElem._pos = [];
@@ -3969,14 +4010,12 @@ var SVGtoPDF = (function() {
       viewportHeight = (options.height || doc.page.height) / pxToPt,
       preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
       getComputedStyleCallback = options.getComputedStyleCallback,
-
-      useCSS = (typeof getComputedStyleCallback === 'function') || (
-        options.useCSS &&
-        typeof SVGElement !== "undefined" &&
-        svg instanceof SVGElement &&
-        typeof getComputedStyle === "function"
-      ),
-
+      useCSS =
+        typeof getComputedStyleCallback === "function" ||
+        (options.useCSS &&
+          typeof SVGElement !== "undefined" &&
+          svg instanceof SVGElement &&
+          typeof getComputedStyle === "function"),
       warningCallback = options.warningCallback,
       fontCallback = options.fontCallback,
       imageCallback = options.imageCallback,
@@ -3984,12 +4023,14 @@ var SVGtoPDF = (function() {
       afterDrawingCallback = options.afterDrawingCallback,
       parseColorCallback = options.parseColorCallback,
       parseNodeCallback = options.parseNodeCallback,
-
       precision = Math.ceil(Math.max(1, options.precision)) || 3;
 
     if (typeof warningCallback !== "function") {
       warningCallback = function(str) {
-        if (typeof console !== undefined && typeof console.warn === "function") {
+        if (
+          typeof console !== undefined &&
+          typeof console.warn === "function"
+        ) {
           console.warn(str);
         }
       };
@@ -4079,7 +4120,7 @@ var SVGtoPDF = (function() {
       warningCallback("SVGtoPDF: the input does not look like a valid SVG");
     }
   }
-  return { directDraw, generateSVGObject }
+  return { directDraw, generateSVGObject };
 })();
 
 if (
