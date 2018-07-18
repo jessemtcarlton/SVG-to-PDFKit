@@ -609,10 +609,10 @@ var SVGtoPDF = (function() {
         }
       );
     }
-    function parseColor(v) {
+    function parseColor(v, ele, attrName) {
       let temp;
       if (typeof parseColorCallback == "function") {
-        temp = parseColorCallback(v);
+        temp = parseColorCallback(v, ele, attrName);
         if (temp) return temp;
       }
 
@@ -1950,8 +1950,9 @@ var SVGtoPDF = (function() {
       "clip-path": { inherit: false, initial: "none" },
       mask: { inherit: false, initial: "none" },
       overflow: {
-        inherit: false,
-        initial: "hidden",
+        inherit: true, // inherit: false
+        // to avoid too many clippaths
+        initial: "visible", //initial: "hidden"
         values: { hidden: "hidden", scroll: "hidden", visible: "visible" }
       }
     };
@@ -2306,7 +2307,7 @@ var SVGtoPDF = (function() {
                 if (value === "none" || value === "transparent") {
                   return "none";
                 }
-                return parseColor(value);
+                return parseColor(value, this, key);
               }.call(this);
               break;
             case "fill":
@@ -2318,13 +2319,13 @@ var SVGtoPDF = (function() {
                 if (value === "currentColor") {
                   return this.get("color");
                 }
-                let color = parseColor(value);
+                let color = parseColor(value, this, key);
                 if (color) {
                   return color;
                 }
                 value = (value || "").split(" ");
                 let object = this.resolveUrl(value[0]),
-                  fallbackColor = parseColor(value[1]);
+                  fallbackColor = parseColor(value[1], this, key);
                 if (object === undefined) {
                   return;
                 } // resolveUrl() returns undefined if the string has not a correct url syntax
@@ -2351,7 +2352,7 @@ var SVGtoPDF = (function() {
                 if (value === "currentColor") {
                   return this.get("color");
                 }
-                return parseColor(value);
+                return parseColor(value, this, key);
               }.call(this);
               break;
             case "marker-start":
@@ -2452,6 +2453,17 @@ var SVGtoPDF = (function() {
         let shape = this.getBoundingShape();
         return shape.boundingBox;
       };
+      this.getClippedBoundingBox = function() {
+        let shape = this.getBoundingShape();
+        const shapeBBox = shape.boundingBox;
+        let clipPathBBox;
+
+        if (this.get("clip-path") !== "none") {
+          let clipPath = new SvgElemClipPath(this.get("clip-path"), null);
+          clipPathBBox = clipPath.getBoundingBox();
+        }
+        return clipPathBBox || shapeBBox;
+      };
     };
 
     var SvgElemStylable = function(obj) {
@@ -2476,6 +2488,7 @@ var SVGtoPDF = (function() {
         let opacity = this.get("opacity"),
           fill = this.get("fill"),
           fillOpacity = this.get("fill-opacity");
+
         if (fill !== "none" && opacity && fillOpacity) {
           if (
             fill instanceof SvgElemGradient ||
@@ -2489,10 +2502,19 @@ var SVGtoPDF = (function() {
             );
           }
           if (Array.isArray(fill)) {
+            // fill is RGBA array
             return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
           } else {
-            // for spot color, we could not calculate opacity here
-            return fill;
+            if (fill.isSpot) {
+              return fill;
+            } else if (fill.typename === "CMYK") {
+              return [fill.components.slice(0, 4), fillOpacity * opacity];
+            } else if (fill.typename === "RGB") {
+              return [fill.components.slice(0, 3), fillOpacity * opacity];
+            } else if (fill.typename === "GRAY") {
+              // gray will be converted to CMYK
+              return [[0, 0, 0, fill.components[0]], fillOpacity * opacity];
+            }
           }
         }
       };
@@ -2515,8 +2537,15 @@ var SVGtoPDF = (function() {
           if (Array.isArray(stroke)) {
             return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
           } else {
-            // for spot color, we could not calculate opacity here
-            return stroke;
+            if (stroke.isSpot) {
+              return stroke;
+            } else if (stroke.typename === "CMYK") {
+              return [stroke.components.slice(0, 4), strokeOpacity * opacity];
+            } else if (stroke.typename === "RGB") {
+              return [stroke.components.slice(0, 3), strokeOpacity * opacity];
+            } else if (stroke.typename === "GRAY") {
+              return [[0, 0, 0, stroke.components[0]], strokeOpacity * opacity];
+            }
           }
         }
       };
@@ -2544,7 +2573,16 @@ var SVGtoPDF = (function() {
         for (let i = 0; i < children.length; i++) {
           if (children[i].get("display") !== "none") {
             if (typeof children[i].getBoundingShape === "function") {
-              let childShape = children[i].getBoundingShape();
+              let childShape;
+              if (children[i].get("clip-path") !== "none") {
+                let clipPath = new SvgElemClipPath(
+                  children[i].get("clip-path"),
+                  null
+                );
+                childShape = clipPath.getBoundingShape();
+              } else {
+                childShape = children[i].getBoundingShape();
+              }
               if (typeof children[i].getTransformation === "function") {
                 childShape.transform(children[i].getTransformation());
               }
@@ -2555,13 +2593,20 @@ var SVGtoPDF = (function() {
         return shape;
       };
       this.drawChildren = function(isClip, isMask) {
-        let children = this.getChildren(), drawChildren = true;
+        let children = this.getChildren(),
+          drawChildren = true;
         for (let i = 0; i < children.length; i++) {
           if (children[i].get("display") !== "none") {
             if (typeof children[i].drawInDocument === "function") {
               if (typeof beforeDrawingCallback == "function") {
-                drawChildren = beforeDrawingCallback(doc, children[i], isClip, isMask);
-                if (typeof drawChildren === 'undefined') {
+                drawChildren = beforeDrawingCallback(
+                  doc,
+                  children[i],
+                  isClip,
+                  isMask,
+                  rootElem
+                );
+                if (typeof drawChildren === "undefined") {
                   drawChildren = true;
                 }
               }
@@ -2569,7 +2614,13 @@ var SVGtoPDF = (function() {
                 children[i].drawInDocument(isClip, isMask);
               }
               if (typeof afterDrawingCallback == "function") {
-                afterDrawingCallback(doc, children[i], isClip, isMask);
+                afterDrawingCallback(
+                  doc,
+                  children[i],
+                  isClip,
+                  isMask,
+                  rootElem
+                );
               }
             }
           }
@@ -3087,13 +3138,35 @@ var SVGtoPDF = (function() {
               if (stopColor === "none") {
                 stopColor = [255, 255, 255, 0];
               }
-              let stopOpacity =
-                stopColor[3] * child.get("stop-opacity") * gOpacity;
+              let stopOpacity;
+              if (stopColor.typename) {
+                stopOpacity = child.get("stop-opacity") * gOpacity;
+                switch (stopColor.typename) {
+                  case "CMYK":
+                    stopColor = stopColor.components.slice(0, 4);
+                    break;
+                  case "RGB":
+                    stopColor = stopColor.components.slice(0, 3);
+                    break;
+                  case "GRAY":
+                    stopColor = [0, 0, 0, stopColor.components[0]];
+                    break;
+                }
+              } else {
+                stopOpacity =
+                  stopColor[3] * child.get("stop-opacity") * gOpacity;
+                stopColor = stopColor.slice(0, 3);
+              }
+
               if (stopOpacity < 1) {
                 if (isMask) {
                   stopColor[0] *= stopOpacity;
                   stopColor[1] *= stopOpacity;
                   stopColor[2] *= stopOpacity;
+                  // CMYK
+                  if (stopColor[3]) {
+                    stopColor[3] *= stopOpacity;
+                  }
                   stopOpacity = 1;
                 }
               }
@@ -3104,15 +3177,15 @@ var SVGtoPDF = (function() {
                   : 1 - child.getPercent("offset", 0)
               );
               if (i === 0 && offset > 0) {
-                grad.stop((n + 0) / nTotal, stopColor.slice(0, 3), stopOpacity);
+                grad.stop((n + 0) / nTotal, stopColor, stopOpacity);
               }
               grad.stop(
                 (n + offset) / (nAfter + nBefore + 1),
-                stopColor.slice(0, 3),
+                stopColor,
                 stopOpacity
               );
               if (i === children.length - 1 && offset < 1) {
-                grad.stop((n + 1) / nTotal, stopColor.slice(0, 3), stopOpacity);
+                grad.stop((n + 1) / nTotal, stopColor, stopOpacity);
               }
             }
           }
@@ -3152,6 +3225,7 @@ var SVGtoPDF = (function() {
           let subPaths = this.shape.getSubPaths(),
             fill = this.getFill(isClip, isMask),
             stroke = this.getStroke(isClip, isMask);
+
           for (let j = 0; j < subPaths.length; j++) {
             if (stroke && isEqual(subPaths[j].totalLength, 0)) {
               let LineWidth = this.get("stroke-width"),
@@ -3761,7 +3835,8 @@ var SVGtoPDF = (function() {
             warningCallback(
               'SVGElemText: failed to open font "' +
                 fontNameorLink +
-                '" in PDFKit. ' + e
+                '" in PDFKit. ' +
+                e
             );
           }
           currentElem._pos = [];
@@ -4085,12 +4160,13 @@ var SVGtoPDF = (function() {
       };
     }
 
+    let rootElem;
     if (typeof svg === "string") {
       svg = parseXml(svg);
     }
     if (svg) {
-      let elem = new SvgElem(svg, null);
-      if (typeof elem.drawInDocument === "function") {
+      rootElem = new SvgElem(svg, null);
+      if (typeof rootElem.drawInDocument === "function") {
         if (options.useCSS && !useCSS) {
           warningCallback(
             "SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers"
@@ -4101,11 +4177,11 @@ var SVGtoPDF = (function() {
             .save()
             .translate(options.x || 0, options.y || 0)
             .scale(pxToPt);
-          elem.drawInDocument();
+          rootElem.drawInDocument();
           doc.restore();
         } else {
           const wrapperGroup = docBeginGroup();
-          elem.drawInDocument();
+          rootElem.drawInDocument();
           const result = { width: viewportWidth, height: viewportHeight };
           docEndGroup(wrapperGroup);
           result.svgGroup = wrapperGroup;
