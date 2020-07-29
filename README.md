@@ -1,11 +1,128 @@
 # SVG-to-PDFKit
+
+## Notes: Added by forker (jacobbubu)
+
+* Using peerDependencies for pdfkit
+* adding callback for element drawing.
+* support color from color books
+  - must use my forked [pdfkit](https://github.com/jacobbubu/pdfkit)
+* support customized getComputedStyle
+  - Add getComputedStyleCallback
+
+### Example for parseColorCallback
+
+``` js
+import SVGtoPDF from "svg-to-pdfkit";
+import { load } from "color-books";
+
+const getColor = (bookName, colorName: string) {
+  const book = load(bookName);
+  if (book.records[colorName]) {
+    return {
+      name: colorName,
+      colorSpace: book.colorSpace,
+      components: book.records[colorName].components,
+      isSpot: book.isSpot
+    };
+  }
+};
+
+// <path d="..." fill="COLOR_BOOK(PANTONE+ CMYK Coated/PANTONE P 24-8 C)"></path>
+const parseColorCallback = (color) => {
+  const temp = color.match(/^COLOR_BOOK\((.+)\/(.+)\)$/);
+  if (temp) {
+    const [bookName, colorName] = temp.slice(1);
+    return getColor(bookName, colorName);
+  }
+};
+
+const draw = (doc, svg, { left, top, width, height }) => {
+  doc.save();
+  try {
+    SVGtoPDF(doc, svg, left, top, {
+      width,
+      height,
+      parseColorCallback
+    });
+  } finally {
+    doc.restore();
+  }
+};
+```
+
+### Example for getComputedStyleCallback
+
+``` coffee
+fs = require 'fs'
+PDFDocument = require 'pdfkit'
+SVGtoPDF = require 'svg-to-pdfkit'
+open = require 'opn'
+cheerio = require 'cheerio'
+css = require 'css'
+
+doc = new PDFDocument autoFirstPage: false
+
+###
+<svg>
+    <defs>
+        <style>
+            .cls-1 {
+                fill: red;
+            }
+            .cls-2 {
+                stroke: yellow;
+            }
+        </style>
+    </defs>
+    <rect class="cls-1 cls-2" x="0" y="0" width="100" height="100" />
+</svg>
+###
+svgContent = fs.readFileSync 'has-css.svg', 'utf8'
+
+$ = cheerio.load svgContent, xmlMode: true
+
+styles = reduce.call $('svg defs style').contents(), (sum, curr) ->
+    if curr.type is 'text'
+        sum += curr.data + '\n'
+    sum
+, ''
+
+parsed = css.parse(styles)
+
+cssProps = parsed.stylesheet.rules.reduce (propsBySelector, rule) ->
+    if rule.type is 'rule'
+        props = rule.declarations.reduce (sum, decor) ->
+            sum[decor.property] = decor.value
+            sum
+        , {}
+
+        for s in rule.selectors
+            propsBySelector[s] = props
+    propsBySelector
+, {}
+
+doc.pipe fs.createWriteStream 'output.pdf'
+
+doc.addPage { size: [512, 512], margin: 0 }
+
+getComputedStyleCallback = (node) ->
+    if node.getAttribute('class')
+        classNames = node.getAttribute('class').split(/\s/)
+        styles = classNames.reduce((sum, name) ->
+            name = '.' + name
+            if cssProps[name]
+                sum = { sum..., cssProps[name]... }
+            sum
+        , {})
+        styles
+
+SVGtoPDF doc, svgContent, 0, 0, { width: 200, height: 200, getComputedStyleCallback }
+doc.end();
+```
+
 Insert SVG into a PDF document created with PDFKit.
 
-## Install
-
-    npm install svg-to-pdfkit --save
-
-## Use
+#### Use:
 
     SVGtoPDF(doc, svg, x, y, options);
 
@@ -19,7 +136,7 @@ Insert SVG into a PDF document created with PDFKit.
 
     doc.addSVG(svg, x, y, options);
 
-## Parameters
+#### Parameters:
 
     doc [PDFDocument] = the PDF document created with PDFKit
     svg [SVGElement or string] = the SVG object or XML code
@@ -30,21 +147,16 @@ Insert SVG into a PDF document created with PDFKit.
       - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
       - fontCallback [function] = function called to get the fonts, see source code
       - imageCallback [function] = same as above for the images (for Node.js)
-      - documentCallback [function] = same as above for the external SVG documents
-      - colorCallback [function] = function called to get color, making mapping to CMYK possible
       - warningCallback [function] = function called when there is a warning
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
       - precision [number] = precision factor for approximative calculations (default = 3)
 
-## Demos
+#### Demos:
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm</a>
 
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/options.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/options.htm</a>
 
-## NodeJS example
-&nbsp; &nbsp; <a href="https://runkit.com/alafr/5a1377ff160182001232a91d" target="_blank">https://runkit.com/alafr/5a1377ff160182001232a91d</a>
-
-## Supported
+#### Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
  - special elements: use, nested svg
  - text elements: text, tspan, textPath
@@ -58,22 +170,22 @@ Insert SVG into a PDF document created with PDFKit.
  - fonts
  - gradients
  - patterns
- - links
 
-## Unsupported
+#### Unsupported:
+ - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
  - filters
- - text attributes: font-variant, writing-mode, unicode-bidi
+ - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
 
-## Warning
+#### Warning:
  - Use an updated PDFKit version (≥0.8.1): see <a href="https://github.com/alafr/pdfkit/wiki/How-to-install-and-build-a-PDFKit-branch">here</a> how to build it, or use the prebuilt file in the <a href="https://github.com/alafr/SVG-to-PDFKit/tree/master/examples">examples</a> folder.
  - There are bugs, please send issues and/or pull requests.
 
-## License
+#### License:
 &nbsp; &nbsp; <a href="http://choosealicense.com/licenses/mit/">MIT</a>
 
-## Other useful projects
+#### Other useful projects:
  - <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, the JavaScript PDF generation library for Node and the browser.
  - For inserting SVG graphics into a PDFKit document there is also <a href="https://github.com/devongovett/svgkit">svgkit</a>.
  - For the opposite conversion, from PDF to SVG, you can use <a href="https://github.com/mozilla/pdf.js">Mozilla's PDF.js</a>.
